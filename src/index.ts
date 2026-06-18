@@ -17,6 +17,8 @@ export type {
   DevConsoleLayout,
   GraphProvider,
   LoginProvider,
+  DevLoginBody,
+  DevLoginResult,
   DevGraph,
   DevGraphNode,
   DevGraphEdge,
