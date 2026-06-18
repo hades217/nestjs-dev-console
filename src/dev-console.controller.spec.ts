@@ -72,6 +72,38 @@ describe('DevConsoleController', () => {
     );
   });
 
+  it('POST /dev/login forwards the optional app/path so a provider can deep-link', async () => {
+    const res = fakeRes();
+    await ctrl.login(
+      { kind: 'user', id: 'u1', app: 'web', path: '/dev-login' },
+      {} as never,
+      res as never,
+    );
+    expect(login).toHaveBeenCalledWith(
+      { kind: 'user', id: 'u1', app: 'web', path: '/dev-login' },
+      expect.objectContaining({ res }),
+    );
+  });
+
+  it('POST /dev/login returns the provider result (e.g. { openUrl }) verbatim', async () => {
+    login.mockReturnValueOnce({ openUrl: 'http://localhost:8000/dev-login?token=abc' });
+    const out = await ctrl.login({ kind: 'user', id: 'u1' }, {} as never, fakeRes() as never);
+    expect(out).toEqual({ openUrl: 'http://localhost:8000/dev-login?token=abc' });
+  });
+
+  it('POST /dev/login drops non-string app/path instead of forwarding junk', async () => {
+    const res = fakeRes();
+    await ctrl.login(
+      { kind: 'user', id: 'u1', app: 123, path: { x: 1 } } as never,
+      {} as never,
+      res as never,
+    );
+    expect(login).toHaveBeenCalledWith(
+      { kind: 'user', id: 'u1' },
+      expect.objectContaining({ res }),
+    );
+  });
+
   it('POST /dev/login rejects a malformed body before touching auth', async () => {
     const res = fakeRes();
     await expect(ctrl.login({ id: 'u1' }, {} as never, res as never)).rejects.toBeInstanceOf(

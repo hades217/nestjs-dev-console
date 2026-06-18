@@ -75,18 +75,40 @@ export interface GraphProvider {
   buildGraph(): Promise<DevGraph> | DevGraph;
 }
 
+/** What the page POSTs to `/dev/login`. `app`/`path` echo the clicked node's
+ *  login descriptor so a token-based provider can build a deep-link itself. */
+export interface DevLoginBody {
+  kind: string;
+  id: string;
+  /** The clicked node's target app key (key of {@link DevConsoleConfig.apps}). */
+  app?: string;
+  /** The clicked node's post-login path. */
+  path?: string;
+}
+
 /**
- * Mints a REAL session for the given identity and sets it on the response
- * (cookie/header — exactly what your normal login does). This is a total auth
- * bypass; it only ever runs behind the default-deny gate. Injected via
- * DEV_CONSOLE_LOGIN_PROVIDER.
+ * Mints a REAL session for the given identity and sets it on the response —
+ * exactly what your normal login does. Two auth styles are supported:
+ *
+ *  - **Cookie/header session** (the default): set the cookie on `ctx.res`; the
+ *    page then opens `apps[app].url + path` and the shared-host cookie logs you in.
+ *  - **Token-in-URL** (Bearer/localStorage apps with no shared cookie): return an
+ *    object `{ openUrl: string }` — a fully-formed URL (e.g.
+ *    `http://localhost:8000/dev-login?token=…`). The page opens THAT instead of
+ *    `base + path`, so the freshly-minted token can ride along in the URL.
+ *
+ * This is a total auth bypass; it only ever runs behind the default-deny gate.
+ * Injected via DEV_CONSOLE_LOGIN_PROVIDER.
  */
 export interface LoginProvider {
   login(
-    body: { kind: string; id: string },
+    body: DevLoginBody,
     ctx: { req: Request; res: Response },
-  ): Promise<unknown> | unknown;
+  ): Promise<DevLoginResult> | DevLoginResult;
 }
+
+/** A provider may return anything; an `openUrl` string overrides the deep-link. */
+export type DevLoginResult = { openUrl?: string } | unknown;
 
 // ─────────────────────────────────────────────────────────────────────────────
 // Client-facing config — serialized into the page (NO secrets here).

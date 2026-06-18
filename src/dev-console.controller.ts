@@ -22,6 +22,7 @@ import {
 import type {
   DevConsoleClientConfig,
   DevConsoleConfig,
+  DevLoginBody,
   GraphProvider,
   LoginProvider,
 } from './types';
@@ -88,19 +89,22 @@ export class DevConsoleController {
   }
 }
 
-/** Validates `{ kind, id }` without pulling in a validation framework. */
-function parseLoginBody(body: unknown): { kind: string; id: string } {
+/** Validates `{ kind, id, app?, path? }` without pulling in a validation framework. */
+function parseLoginBody(body: unknown): DevLoginBody {
   if (typeof body !== 'object' || body === null) {
     throw new BadRequestException('body must be an object');
   }
-  const { kind, id } = body as Record<string, unknown>;
+  const { kind, id, app, path } = body as Record<string, unknown>;
   if (typeof kind !== 'string' || kind.length < 1 || kind.length > 32) {
     throw new BadRequestException('kind must be a 1–32 char string');
   }
   if (typeof id !== 'string' || id.length < 1 || id.length > 64) {
     throw new BadRequestException('id must be a 1–64 char string');
   }
-  return { kind, id };
+  const out: DevLoginBody = { kind, id };
+  if (typeof app === 'string' && app.length <= 64) out.app = app;
+  if (typeof path === 'string' && path.length <= 256) out.path = path;
+  return out;
 }
 
 /** JSON for inline <script>: escape `<` so a `</script>` in data can't break out. */

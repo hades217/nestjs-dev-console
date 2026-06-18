@@ -1,6 +1,6 @@
 {
   "name": "@airbotix/nestjs-dev-console",
-  "version": "0.1.0",
+  "version": "0.2.0",
   "description": "Local-dev-only impersonation console for NestJS: a role/entity map with one-click \"Login as\" that mints a REAL session and deep-links into your frontends. Default-deny gated — never reachable in production.",
   "keywords": [
     "nestjs",

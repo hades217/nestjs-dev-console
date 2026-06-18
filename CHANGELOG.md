@@ -3,7 +3,16 @@
 All notable changes to this project are documented here.
 Format: [Keep a Changelog](https://keepachangelog.com/). Newest first.
 
-## [Unreleased]
+## [0.2.0] - 2026-06-18
+
+### Added
+- **Token-in-URL login** for Bearer/localStorage apps that don't share a
+  backend cookie: a `LoginProvider` may now return `{ openUrl }` and the page
+  opens that URL instead of `apps[app].url + path` — so a freshly-minted token
+  can ride along in the deep-link (e.g. `…/dev-login?token=…`).
+- The page now POSTs the clicked node's `app` + `path` to `/dev/login`, so a
+  token-based provider can build the deep-link itself. `DevLoginBody` /
+  `DevLoginResult` types exported.
 
 ### Changed
 - `package.json`: `prepublishOnly` → `prepare` so the package builds `dist/`

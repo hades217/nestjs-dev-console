@@ -165,6 +165,26 @@ collide. This console doesn’t use `localStorage` for auth at all.
 **Does it run in production?** No — see the security model. `forRoot()` returns an
 empty module there and the route 404s.
 
+**My app uses a Bearer token in `localStorage`, not a shared cookie — how does
+deep-link login work?** Return `{ openUrl }` from your `LoginProvider`: the page
+opens that URL instead of `apps[app].url + path`, so the freshly-minted token can
+ride in the URL. Add a tiny dev-only frontend route that reads it and persists it
+the way your normal login does:
+
+```ts
+// login.provider.ts
+login(body) {                                  // body = { kind, id, app, path }
+  const token = this.auth.mintToken(body.id);  // your real login machinery
+  const base = this.webBaseFor(body.app);      // e.g. http://localhost:8000
+  return { openUrl: `${base}/dev-login?token=${token}&redirect=${body.path || '/'}` };
+}
+```
+```ts
+// frontend: /dev-login (dev-gated) — store token like normal login, then redirect
+localStorage.setItem('token', params.get('token'));
+// hydrate auth state (re-fetch current user), then router.push(params.get('redirect'))
+```
+
 ## License
 
 MIT

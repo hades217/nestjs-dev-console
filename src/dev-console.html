@@ -473,14 +473,26 @@
             method: 'POST',
             headers: { 'content-type': 'application/json' },
             credentials: 'include',
-            body: JSON.stringify({ kind: node.login.kind, id: node.login.id }),
+            body: JSON.stringify({
+              kind: node.login.kind,
+              id: node.login.id,
+              app: node.login.app,
+              path: node.login.path,
+            }),
           });
           if (!res.ok) {
             const t = await res.text();
             toast('Login failed', `<span class="err">${res.status}</span> ${esc(t).slice(0, 200)}`, accent);
             return;
           }
-          const url = (GRAPH.apps[node.login.app] || '') + node.login.path;
+          // A token-based provider can return { openUrl } to override the deep-link
+          // (e.g. carry a freshly-minted token in the URL). Cookie providers return
+          // their session payload (no openUrl) → fall back to base + path.
+          const data = await res.json().catch(() => null);
+          const url =
+            data && typeof data.openUrl === 'string' && data.openUrl
+              ? data.openUrl
+              : (GRAPH.apps[node.login.app] || '') + node.login.path;
           toast(
             `Logged in as ${node.name}`,
             `session set → opening\n${esc(url)}\n<span class="ok">✓ open the tab to land in-session</span>`,
