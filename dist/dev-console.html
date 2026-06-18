@@ -1,0 +1,614 @@
+<!doctype html>
+<html lang="en">
+  <head>
+    <meta charset="utf-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1" />
+    <title>Dev Console — LOCAL DEV ONLY</title>
+    <style>
+      :root {
+        --bg: #0f1117;
+        --panel: #171a23;
+        --panel-2: #1d212c;
+        --line: #2a2f3c;
+        --ink: #e6e9f0;
+        --ink-dim: #98a0b3;
+        --ink-faint: #6b7282;
+        --mono: ui-monospace, SFMono-Regular, 'SF Mono', Menlo, Consolas, monospace;
+        --sans: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, Helvetica, Arial, sans-serif;
+        --accent-default: #38bdf8;
+        --edge: #3a4150;
+      }
+      * { box-sizing: border-box; }
+      html, body { margin: 0; height: 100%; }
+      body {
+        background: radial-gradient(1200px 700px at 70% -10%, #1a1f2e 0%, var(--bg) 55%);
+        color: var(--ink);
+        font-family: var(--sans);
+        -webkit-font-smoothing: antialiased;
+      }
+
+      header.topbar {
+        display: flex;
+        align-items: center;
+        gap: 16px;
+        padding: 12px 20px;
+        border-bottom: 1px solid var(--line);
+        background: rgba(17, 20, 30, 0.7);
+        backdrop-filter: blur(8px);
+        position: sticky;
+        top: 0;
+        z-index: 50;
+      }
+      .brand { display: flex; align-items: center; gap: 10px; font-weight: 700; letter-spacing: 0.2px; }
+      .brand .logo {
+        width: 26px; height: 26px; border-radius: 7px;
+        background: linear-gradient(135deg, #a78bfa, #38bdf8);
+        display: grid; place-items: center; font-size: 15px;
+      }
+      .dev-pill {
+        font: 600 11px/1 var(--mono);
+        color: #ffb4b4; background: #3a1d22; border: 1px solid #5b2b32;
+        padding: 5px 9px; border-radius: 999px; letter-spacing: 0.6px;
+      }
+      .env {
+        margin-left: auto; display: flex; align-items: center; gap: 16px;
+        font: 500 12px/1 var(--mono); color: var(--ink-dim);
+      }
+      .svc { display: flex; align-items: center; gap: 6px; }
+      .dot { width: 8px; height: 8px; border-radius: 50%; background: var(--ink-faint); display: inline-block; }
+      .dot.up { background: #34d399; box-shadow: 0 0 8px #34d399; }
+      .dot.down { background: #f87171; box-shadow: 0 0 8px #f87171; }
+      .btn {
+        font: 600 12px var(--sans); color: var(--ink);
+        background: var(--panel-2); border: 1px solid var(--line);
+        padding: 7px 12px; border-radius: 8px; cursor: pointer;
+      }
+      .btn:hover { border-color: #3a4150; background: #232838; }
+
+      .legend {
+        display: flex; flex-wrap: wrap; gap: 14px 20px;
+        padding: 12px 20px; border-bottom: 1px solid var(--line);
+        font-size: 12px; color: var(--ink-dim);
+      }
+      .legend .item { display: flex; align-items: center; gap: 7px; }
+      .legend .sw { width: 12px; height: 12px; border-radius: 4px; }
+      .legend .edge-key { display: flex; align-items: center; gap: 7px; }
+      .legend .edge-key svg { display: block; }
+
+      .canvas-wrap { padding: 30px 20px 50px; overflow-x: auto; }
+      .canvas { position: relative; width: min(1280px, 100%); min-width: 1000px; margin: 0 auto; }
+      svg.edges {
+        position: absolute; inset: 0; width: 100%; height: 100%;
+        pointer-events: none; z-index: 1; overflow: visible;
+      }
+      svg.edges path {
+        fill: none; stroke: var(--edge); stroke-width: 1.6; opacity: 0.5;
+        transition: opacity 0.15s, stroke 0.15s, stroke-width 0.15s;
+      }
+      svg.edges path.authority { stroke-dasharray: 4 5; opacity: 0.28; }
+      svg.edges path.hot { opacity: 1; stroke: var(--accent-hot, #cdd3e0); stroke-width: 2.4; }
+      svg.edges text.elabel {
+        fill: var(--ink-dim); font: 600 11px var(--mono);
+        paint-order: stroke; stroke: var(--bg); stroke-width: 5px; letter-spacing: 0.3px;
+      }
+
+      .stage { position: relative; z-index: 2; }
+      .platform-row { display: flex; justify-content: center; flex-wrap: wrap; gap: 60px; margin-bottom: 90px; }
+      .columns { display: flex; gap: 110px; align-items: flex-start; }
+      .col { display: flex; flex-direction: column; align-items: center; flex: 1; min-width: 0; }
+      .col.ownership { flex: 1.7; --zone: #f0a868; }
+      .col.delivery { --zone: #34d399; }
+      .col-head {
+        align-self: stretch; text-align: center; margin-bottom: 26px;
+        padding-bottom: 10px; border-bottom: 1px dashed color-mix(in srgb, var(--zone) 30%, transparent);
+      }
+      .col-head .zn { display: block; font-weight: 700; font-size: 13px; }
+      .col-head .zs { display: block; font: 500 10.5px var(--mono); color: var(--ink-faint); margin-top: 4px; }
+
+      .group {
+        display: flex; flex-direction: column; align-items: center; margin-bottom: 40px;
+        padding: 20px 24px 26px;
+        border: 1px solid color-mix(in srgb, var(--zone) 30%, var(--line));
+        border-radius: 18px; background: color-mix(in srgb, var(--zone) 6%, transparent);
+      }
+      .subrow { display: flex; gap: 22px; margin-top: 54px; justify-content: center; flex-wrap: wrap; }
+      .group .kids-of { display: flex; flex-direction: column; align-items: center; gap: 60px; margin-top: 54px; }
+
+      .node {
+        position: relative; width: 244px; display: flex; flex-direction: column;
+        background: linear-gradient(180deg, var(--panel) 0%, var(--panel-2) 100%);
+        border: 1px solid var(--line); border-radius: 14px;
+        box-shadow: 0 8px 24px rgba(0, 0, 0, 0.35);
+        transition: transform 0.12s ease, box-shadow 0.15s, border-color 0.15s; overflow: hidden;
+      }
+      .node.compact { width: 212px; }
+      .node:hover { box-shadow: 0 14px 36px rgba(0, 0, 0, 0.5); border-color: var(--accent); transform: translateY(-3px); }
+      .node::before { content: ''; position: absolute; inset: 0 0 auto 0; height: 4px; background: var(--accent); }
+      .node .head { display: flex; align-items: center; gap: 9px; padding: 14px 14px 9px; }
+      .node .ico {
+        flex: 0 0 auto; width: 30px; height: 30px; border-radius: 9px;
+        display: grid; place-items: center; font-size: 16px;
+        background: color-mix(in srgb, var(--accent) 18%, transparent);
+        border: 1px solid color-mix(in srgb, var(--accent) 40%, transparent);
+      }
+      .node .titles { line-height: 1.2; min-width: 0; }
+      .node .name { font-weight: 700; font-size: 14px; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+      .node .tag {
+        font: 600 10px var(--mono); letter-spacing: 0.5px; text-transform: uppercase;
+        color: var(--accent); white-space: nowrap; overflow: hidden; text-overflow: ellipsis;
+      }
+      .node .body { padding: 2px 14px 12px; display: grid; gap: 5px; flex: 1; }
+      .node .email {
+        font: 500 11px var(--mono); color: var(--ink); background: rgba(255, 255, 255, 0.03);
+        border: 1px solid var(--line); border-radius: 7px; padding: 6px 8px; margin-bottom: 3px;
+        overflow: hidden; text-overflow: ellipsis; white-space: nowrap;
+      }
+      .node .row { display: flex; justify-content: space-between; gap: 10px; font-size: 11.5px; align-items: baseline; }
+      .node .row .k { color: var(--ink-faint); flex: 0 0 auto; }
+      .node .row .v {
+        color: var(--ink); font-family: var(--mono); text-align: right;
+        min-width: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap;
+      }
+      .node .login {
+        display: flex; align-items: center; justify-content: space-between; gap: 8px;
+        margin: auto 12px 12px; padding: 9px 11px;
+        background: color-mix(in srgb, var(--accent) 14%, var(--panel-2));
+        border: 1px solid color-mix(in srgb, var(--accent) 35%, transparent);
+        border-radius: 9px; cursor: pointer; font-weight: 600; font-size: 12px; color: var(--ink);
+        transition: background 0.12s, transform 0.08s;
+      }
+      .node .login:hover { background: color-mix(in srgb, var(--accent) 26%, var(--panel-2)); }
+      .node .login:active { transform: scale(0.98); }
+      .node .login .where { flex: 0 0 auto; font: 500 10px var(--mono); color: var(--ink-dim); }
+
+      .empty { color: var(--ink-faint); font-size: 13px; text-align: center; padding: 40px; line-height: 1.6; }
+      .empty code { font-family: var(--mono); color: var(--ink-dim); }
+
+      .status {
+        margin: 16px 20px 0; padding: 14px 16px;
+        border: 1px solid #5b4a2b; background: #241e12; border-radius: 12px; font-size: 13px;
+      }
+      .status[hidden] { display: none; }
+      .status h4 { margin: 0 0 10px; font-size: 13px; color: #fbbf24; }
+      .status ul { margin: 0; padding: 0; list-style: none; display: grid; gap: 8px; }
+      .status li { display: flex; align-items: center; gap: 10px; flex-wrap: wrap; }
+      .status .svc-name { min-width: 160px; font-weight: 600; }
+      .status .svc-name .url { color: var(--ink-faint); font: 500 11px var(--mono); margin-left: 6px; }
+      .status code {
+        font-family: var(--mono); background: #171a23; border: 1px solid var(--line);
+        border-radius: 6px; padding: 3px 8px; color: var(--ink-dim); cursor: pointer;
+      }
+      .status code:hover { color: var(--ink); border-color: #3a4150; }
+      .status .all { margin-top: 12px; color: var(--ink-faint); }
+      .node .login.down {
+        opacity: 0.6; cursor: not-allowed;
+        background: color-mix(in srgb, #f87171 10%, var(--panel-2));
+        border-color: color-mix(in srgb, #f87171 32%, transparent);
+      }
+      .node .login.down .where { color: #f8a4a4; }
+
+      .toast-wrap {
+        position: fixed; right: 18px; bottom: 18px; z-index: 200;
+        display: grid; gap: 10px; width: 420px; max-width: calc(100vw - 36px);
+      }
+      .toast {
+        background: var(--panel); border: 1px solid var(--line); border-left: 3px solid var(--accent, #34d399);
+        border-radius: 10px; padding: 12px 14px; box-shadow: 0 10px 30px rgba(0, 0, 0, 0.5);
+        animation: slideIn 0.2s ease;
+      }
+      @keyframes slideIn { from { transform: translateY(8px); opacity: 0; } to { transform: none; opacity: 1; } }
+      .toast .t-title { font-weight: 700; font-size: 13px; margin-bottom: 6px; }
+      .toast pre { margin: 0; font: 500 11px/1.55 var(--mono); color: var(--ink-dim); white-space: pre-wrap; word-break: break-all; }
+      .toast .ok { color: #34d399; }
+      .toast .err { color: #f87171; }
+
+      .footer-note { text-align: center; color: var(--ink-faint); font-size: 12px; padding: 26px 20px 10px; }
+      .footer-note code { font-family: var(--mono); color: var(--ink-dim); }
+    </style>
+  </head>
+  <body>
+    <header class="topbar">
+      <div class="brand"><span class="logo" id="brand-logo">🛠</span> <span id="brand-title">Dev Console</span></div>
+      <span class="dev-pill" id="brand-pill">● LOCAL DEV ONLY</span>
+      <div class="env" id="env">
+        <span>NODE_ENV=<b id="node-env" style="color: #34d399">…</b></span>
+        <span id="svc-dots"></span>
+        <button class="btn" onclick="loadGraph()">⟳ Refresh</button>
+      </div>
+    </header>
+
+    <div class="legend" id="legend"></div>
+
+    <div class="status" id="status" hidden></div>
+
+    <div class="canvas-wrap">
+      <div class="canvas" id="canvas">
+        <svg class="edges" id="edges"></svg>
+        <div class="stage" id="stage"></div>
+      </div>
+      <div class="footer-note" id="footer-note"></div>
+    </div>
+
+    <div class="toast-wrap" id="toasts"></div>
+
+    <!--DEVCONSOLE_CONFIG-->
+    <script>
+      // ── config injected by the controller (window.__DEVCONSOLE__) ──────────────
+      const CFG = window.__DEVCONSOLE__ || {};
+      const BRAND = CFG.branding || {};
+      const ROLES = CFG.roles || {};
+      const APPS = CFG.apps || {};
+      const LAYOUT = CFG.layout || {};
+      const DEFAULT_ACCENT = '#38bdf8';
+
+      // branding
+      document.title = (BRAND.title || 'Dev Console') + ' — LOCAL DEV ONLY';
+      if (BRAND.logo) document.getElementById('brand-logo').textContent = BRAND.logo;
+      document.getElementById('brand-title').textContent = BRAND.title || 'Dev Console';
+      if (BRAND.pill) document.getElementById('brand-pill').textContent = BRAND.pill;
+
+      const ICONS = {};
+      const ACCENT_HEX = {};
+      for (const [k, v] of Object.entries(ROLES)) {
+        ICONS[k] = v.icon;
+        ACCENT_HEX[k] = v.color;
+      }
+      const accentOf = (role) => ACCENT_HEX[role] || DEFAULT_ACCENT;
+
+      // legend (roles + edge keys)
+      (function buildLegend() {
+        const el = document.getElementById('legend');
+        let html = '';
+        for (const [k, v] of Object.entries(ROLES))
+          html += `<div class="item"><span class="sw" style="background:${esc(v.color)}"></span>${esc(v.label || k)}</div>`;
+        html +=
+          `<span style="flex:1"></span>` +
+          `<div class="edge-key"><svg width="34" height="10"><line x1="0" y1="5" x2="34" y2="5" stroke="#3a4150" stroke-width="2"/></svg>membership / enrollment</div>` +
+          `<div class="edge-key"><svg width="34" height="10"><line x1="0" y1="5" x2="34" y2="5" stroke="#3a4150" stroke-width="2" stroke-dasharray="4 5"/></svg>manages (authority)</div>`;
+        el.innerHTML = html;
+      })();
+
+      // header service dots: api + one per app
+      (function buildDots() {
+        const el = document.getElementById('svc-dots');
+        let html = `<span class="svc"><span class="dot" id="svc-api"></span>api</span>`;
+        for (const key of Object.keys(APPS))
+          html += `<span class="svc"><span class="dot" data-app="${esc(key)}"></span>${esc(shortLabel(key))}</span>`;
+        el.innerHTML = html;
+      })();
+      function shortLabel(key) {
+        return key.length > 12 ? key.slice(0, 12) : key;
+      }
+
+      document.getElementById('footer-note').innerHTML =
+        LAYOUT.footerNote ||
+        'Click a role to mint a dev session &amp; open its app. Live data from the local DB; disabled when <code>NODE_ENV=production</code>.';
+
+      let GRAPH = null;
+      const canvas = document.getElementById('canvas');
+      const svg = document.getElementById('edges');
+      const stage = document.getElementById('stage');
+
+      function nodeCard(node, compact) {
+        const el = document.createElement('div');
+        el.className = 'node' + (compact ? ' compact' : '');
+        el.dataset.id = node.id;
+        el.dataset.accent = node.role;
+        el.style.setProperty('--accent', accentOf(node.role));
+        const ico = ICONS[node.role] || '•';
+        let body = '';
+        if (node.email) body += `<div class="email">${esc(node.email)}</div>`;
+        for (const r of node.info || [])
+          body += `<div class="row"><span class="k">${esc(r.k)}</span><span class="v">${esc(r.v)}</span></div>`;
+        el.innerHTML =
+          `<div class="head"><div class="ico">${ico}</div><div class="titles"><div class="name">${esc(node.name)}</div><div class="tag">${esc(node.tag)}</div></div></div>` +
+          `<div class="body">${body}</div>`;
+        if (node.login) {
+          const url = GRAPH.apps[node.login.app] || (APPS[node.login.app] || {}).url || '';
+          const port = (url.match(/:(\d+)/) || [])[1] || '';
+          const btn = document.createElement('div');
+          btn.className = 'login';
+          btn.dataset.app = node.login.app;
+          btn.innerHTML = `Login as ${esc(node.name)} →<span class="where">:${port}</span>`;
+          btn.onclick = () => doLogin(node);
+          el.appendChild(btn);
+        }
+        return el;
+      }
+
+      function render() {
+        stage.innerHTML = '';
+        const g = GRAPH;
+        const hasAny =
+          g.platform.length || g.ownership.length || g.delivery.length || g.unaffiliated.length;
+        if (!hasAny) {
+          const hint = LAYOUT.seedHint
+            ? `Seed it: <code>${esc(LAYOUT.seedHint)}</code>`
+            : 'Seed your local DB to see nodes here.';
+          stage.innerHTML = `<div class="empty">No data in the local DB yet.<br>${hint}</div>`;
+          svg.innerHTML = '';
+          return;
+        }
+
+        const prow = document.createElement('div');
+        prow.className = 'platform-row';
+        for (const n of g.platform) prow.appendChild(nodeCard(n, false));
+        stage.appendChild(prow);
+
+        const cols = document.createElement('div');
+        cols.className = 'columns';
+
+        const oHead = LAYOUT.ownershipHead || { title: '🏠 Accounts', sub: '' };
+        const ownership = document.createElement('div');
+        ownership.className = 'col ownership';
+        ownership.innerHTML = `<div class="col-head"><span class="zn">${esc(oHead.title)}</span><span class="zs">${esc(oHead.sub || '')}</span></div>`;
+        for (const grp of g.ownership) {
+          const box = document.createElement('div');
+          box.className = 'group';
+          box.appendChild(nodeCard(grp.owner, true));
+          if (grp.members.length) {
+            const sr = document.createElement('div');
+            sr.className = 'subrow';
+            for (const m of grp.members) sr.appendChild(nodeCard(m, true));
+            box.appendChild(sr);
+          }
+          ownership.appendChild(box);
+        }
+        for (const u of g.unaffiliated) {
+          const box = document.createElement('div');
+          box.className = 'group';
+          box.appendChild(nodeCard(u, true));
+          ownership.appendChild(box);
+        }
+        if (!g.ownership.length && !g.unaffiliated.length)
+          ownership.innerHTML += `<div class="empty">None.</div>`;
+        cols.appendChild(ownership);
+
+        const dHead = LAYOUT.deliveryHead || { title: '🎓 Delivery', sub: '' };
+        const delivery = document.createElement('div');
+        delivery.className = 'col delivery';
+        delivery.innerHTML = `<div class="col-head"><span class="zn">${esc(dHead.title)}</span><span class="zs">${esc(dHead.sub || '')}</span></div>`;
+        for (const grp of g.delivery) {
+          const box = document.createElement('div');
+          box.className = 'group';
+          if (grp.provider) box.appendChild(nodeCard(grp.provider, false));
+          if (grp.items.length) {
+            const stack = document.createElement('div');
+            stack.className = 'kids-of';
+            for (const c of grp.items) stack.appendChild(nodeCard(c, false));
+            box.appendChild(stack);
+          }
+          delivery.appendChild(box);
+        }
+        if (!g.delivery.length) delivery.innerHTML += `<div class="empty">None.</div>`;
+        cols.appendChild(delivery);
+
+        stage.appendChild(cols);
+        requestAnimationFrame(drawEdges);
+      }
+
+      function boxOf(id) {
+        const el = canvas.querySelector(`[data-id="${cssEsc(id)}"]`);
+        if (!el) return null;
+        const cr = canvas.getBoundingClientRect(),
+          r = el.getBoundingClientRect();
+        return {
+          cx: r.left - cr.left + r.width / 2,
+          cy: r.top - cr.top + r.height / 2,
+          top: r.top - cr.top,
+          bottom: r.top - cr.top + r.height,
+          left: r.left - cr.left,
+          right: r.left - cr.left + r.width,
+        };
+      }
+
+      function drawEdges() {
+        svg.innerHTML = '';
+        for (const e of GRAPH.edges) {
+          const a = boxOf(e.from),
+            b = boxOf(e.to);
+          if (!a || !b) continue;
+          const dy = Math.abs(a.cy - b.cy),
+            dx = Math.abs(a.cx - b.cx);
+          let sx, sy, ex, ey, d, lx, ly;
+          if (dy > dx) {
+            const up = a.cy <= b.cy ? a : b,
+              lo = a.cy <= b.cy ? b : a;
+            sx = up.cx; sy = up.bottom; ex = lo.cx; ey = lo.top;
+            const my = (sy + ey) / 2;
+            d = `M ${sx} ${sy} C ${sx} ${my}, ${ex} ${my}, ${ex} ${ey}`;
+            lx = (sx + ex) / 2; ly = my;
+          } else {
+            const l = a.cx <= b.cx ? a : b,
+              rt = a.cx <= b.cx ? b : a;
+            sx = l.right; sy = l.cy; ex = rt.left; ey = rt.cy;
+            const mx = (sx + ex) / 2;
+            d = `M ${sx} ${sy} C ${mx} ${sy}, ${mx} ${ey}, ${ex} ${ey}`;
+            lx = (sx + ex) / 2; ly = (sy + ey) / 2;
+          }
+          const p = document.createElementNS('http://www.w3.org/2000/svg', 'path');
+          p.setAttribute('d', d);
+          if (e.type === 'authority') p.classList.add('authority');
+          p.dataset.from = e.from;
+          p.dataset.to = e.to;
+          svg.appendChild(p);
+          if (e.label) {
+            const t = document.createElementNS('http://www.w3.org/2000/svg', 'text');
+            t.setAttribute('x', lx);
+            t.setAttribute('y', ly - 4);
+            t.setAttribute('text-anchor', 'middle');
+            t.classList.add('elabel');
+            t.textContent = e.label;
+            svg.appendChild(t);
+          }
+        }
+        canvas.querySelectorAll('.node').forEach((node) => {
+          const id = node.dataset.id,
+            accent = accentOf(node.dataset.accent);
+          node.onmouseenter = () =>
+            svg.querySelectorAll('path').forEach((p) => {
+              if (p.dataset.from === id || p.dataset.to === id) {
+                p.classList.add('hot');
+                p.style.setProperty('--accent-hot', accent);
+              }
+            });
+          node.onmouseleave = () =>
+            svg.querySelectorAll('path.hot').forEach((p) => p.classList.remove('hot'));
+        });
+      }
+
+      async function doLogin(node) {
+        const accent = accentOf(node.role);
+        const app = node.login.app;
+        if (HEALTH[app] === false) {
+          toast(
+            `${(APPS[app] && APPS[app].label) || app} isn't running`,
+            `start it first, then click again:\n${cmdFor(app)}`,
+            '#fbbf24',
+          );
+          return;
+        }
+        try {
+          const res = await fetch('dev/login', {
+            method: 'POST',
+            headers: { 'content-type': 'application/json' },
+            credentials: 'include',
+            body: JSON.stringify({
+              kind: node.login.kind,
+              id: node.login.id,
+              app: node.login.app,
+              path: node.login.path,
+            }),
+          });
+          if (!res.ok) {
+            const t = await res.text();
+            toast('Login failed', `<span class="err">${res.status}</span> ${esc(t).slice(0, 200)}`, accent);
+            return;
+          }
+          // A token-based provider can return { openUrl } to override the deep-link
+          // (e.g. carry a freshly-minted token in the URL). Cookie providers return
+          // their session payload (no openUrl) → fall back to base + path.
+          const data = await res.json().catch(() => null);
+          const url =
+            data && typeof data.openUrl === 'string' && data.openUrl
+              ? data.openUrl
+              : (GRAPH.apps[node.login.app] || '') + node.login.path;
+          toast(
+            `Logged in as ${node.name}`,
+            `session set → opening\n${esc(url)}\n<span class="ok">✓ open the tab to land in-session</span>`,
+            accent,
+          );
+          window.open(url, '_blank');
+        } catch (err) {
+          toast('Login error', `<span class="err">${esc(String(err))}</span>`, accent);
+        }
+      }
+
+      async function loadGraph() {
+        try {
+          const res = await fetch('dev/graph', { credentials: 'include' });
+          if (!res.ok) {
+            stage.innerHTML = `<div class="empty">GET dev/graph → ${res.status}</div>`;
+            return;
+          }
+          GRAPH = await res.json();
+          document.getElementById('node-env').textContent = GRAPH.env.node_env;
+          render();
+          refreshHealth();
+        } catch (err) {
+          stage.innerHTML = `<div class="empty">Backend unreachable.<br>${esc(String(err))}</div>`;
+        }
+      }
+
+      // ── service health: which apps are up + how to start the ones that aren't ──
+      const HEALTH = { api: true };
+      const cmdFor = (app) => (APPS[app] && APPS[app].startCmd) || `# start ${app}`;
+
+      async function ping(url) {
+        try {
+          await fetch(url, { mode: 'no-cors' });
+          return true;
+        } catch {
+          return false;
+        }
+      }
+
+      async function refreshHealth() {
+        HEALTH.api = await ping('health');
+        if (GRAPH) {
+          for (const app of Object.keys(APPS)) HEALTH[app] = await ping(GRAPH.apps[app] || (APPS[app] || {}).url);
+        }
+        applyHealth();
+      }
+
+      function setDot(el, up) {
+        if (el) el.className = 'dot ' + (up ? 'up' : 'down');
+      }
+
+      function applyHealth() {
+        setDot(document.getElementById('svc-api'), HEALTH.api);
+        for (const key of Object.keys(APPS))
+          setDot(document.querySelector(`#svc-dots .dot[data-app="${cssEsc(key)}"]`), HEALTH[key]);
+
+        const status = document.getElementById('status');
+        const down = Object.keys(APPS).filter((a) => HEALTH[a] === false);
+        if (!down.length) {
+          status.hidden = true;
+        } else {
+          status.hidden = false;
+          const n = down.length;
+          const startAll = LAYOUT.startAllCmd
+            ? `<div class="all">…or start everything at once: <code data-cmd="${esc(LAYOUT.startAllCmd)}">${esc(LAYOUT.startAllCmd)}</code></div>`
+            : '';
+          status.innerHTML =
+            `<h4>⚠ ${n} app${n > 1 ? 's are' : ' is'} not running — start ${n > 1 ? 'them' : 'it'} to log in:</h4>` +
+            `<ul>${down
+              .map(
+                (a) =>
+                  `<li><span class="svc-name">${esc((APPS[a] && APPS[a].label) || a)}<span class="url">${esc((APPS[a] && APPS[a].url) || '')}</span></span><code data-cmd="${esc(cmdFor(a))}">${esc(cmdFor(a))}</code></li>`,
+              )
+              .join('')}</ul>` +
+            startAll;
+          status.querySelectorAll('code[data-cmd]').forEach((c) => {
+            c.onclick = () => {
+              if (navigator.clipboard) navigator.clipboard.writeText(c.dataset.cmd);
+              toast('Copied to clipboard', c.dataset.cmd, '#34d399');
+            };
+          });
+        }
+
+        document.querySelectorAll('.node .login[data-app]').forEach((btn) => {
+          btn.classList.toggle('down', HEALTH[btn.dataset.app] === false);
+        });
+      }
+
+      function toast(title, body, accent = '#34d399') {
+        const wrap = document.getElementById('toasts');
+        const el = document.createElement('div');
+        el.className = 'toast';
+        el.style.setProperty('--accent', accent);
+        el.innerHTML = `<div class="t-title">${esc(title)}</div><pre>${body}</pre>`;
+        wrap.appendChild(el);
+        setTimeout(() => {
+          el.style.transition = 'opacity .3s';
+          el.style.opacity = '0';
+          setTimeout(() => el.remove(), 300);
+        }, 5000);
+      }
+
+      function esc(s) {
+        return String(s).replace(
+          /[&<>"']/g,
+          (c) => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' })[c],
+        );
+      }
+      function cssEsc(s) {
+        return window.CSS && CSS.escape ? CSS.escape(s) : String(s).replace(/["\\]/g, '\\$&');
+      }
+
+      window.addEventListener('resize', () => GRAPH && drawEdges());
+      loadGraph();
+      setInterval(refreshHealth, 4000);
+    </script>
+  </body>
+</html>

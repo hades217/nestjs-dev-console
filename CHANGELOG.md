@@ -5,6 +5,12 @@ Format: [Keep a Changelog](https://keepachangelog.com/). Newest first.
 
 ## [0.2.0] - 2026-06-18
 
+### Changed (packaging)
+- Ship a prebuilt `dist/` in the repo (no longer gitignored) so the package
+  installs cleanly under package managers that don't run a dependency's
+  `prepare` script on git installs (e.g. **bun**, which gates lifecycle scripts).
+  The `prepare` script is kept for npm git installs / publish.
+
 ### Added
 - **Token-in-URL login** for Bearer/localStorage apps that don't share a
   backend cookie: a `LoginProvider` may now return `{ openUrl }` and the page
