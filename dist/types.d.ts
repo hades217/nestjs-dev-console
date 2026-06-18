@@ -7,6 +7,14 @@ export interface DevLoginDescriptor {
     app: string;
     /** Path appended to the app URL after login (e.g. '/portal'). */
     path: string;
+    /** Button label override. Defaults to "Login as <name>" (open) / "📋 copy token" (copy). */
+    label?: string;
+    /**
+     * 'open' (default) deep-links into the app. 'copy' instead copies the minted
+     * token to the clipboard — for ends a browser can't open (WeChat mini-programs,
+     * native apps): your LoginProvider returns `{ token }` and the page copies it.
+     */
+    mode?: 'open' | 'copy';
 }
 export interface DevGraphNode {
     id: string;
@@ -21,7 +29,13 @@ export interface DevGraphNode {
         k: string;
         v: string;
     }[];
+    /** Single login target (back-compat). Prefer {@link logins} for multiple apps. */
     login?: DevLoginDescriptor;
+    /**
+     * Multiple login targets — one button each (e.g. open web + open admin + copy
+     * token for a mini-program). Takes precedence over {@link login} when non-empty.
+     */
+    logins?: DevLoginDescriptor[];
 }
 export interface DevGraphEdge {
     from: string;
@@ -69,6 +83,8 @@ export interface DevLoginBody {
     app?: string;
     /** The clicked node's post-login path. */
     path?: string;
+    /** 'open' (default) or 'copy' — echoes the clicked target's {@link DevLoginDescriptor.mode}. */
+    mode?: 'open' | 'copy';
 }
 /**
  * Mints a REAL session for the given identity and sets it on the response —
@@ -90,9 +106,13 @@ export interface LoginProvider {
         res: Response;
     }): Promise<DevLoginResult> | DevLoginResult;
 }
-/** A provider may return anything; an `openUrl` string overrides the deep-link. */
+/**
+ * A provider may return anything. For `open` targets an `openUrl` string overrides
+ * the deep-link; for `copy` targets the page copies `token` to the clipboard.
+ */
 export type DevLoginResult = {
     openUrl?: string;
+    token?: string;
 } | unknown;
 export interface DevConsoleRole {
     /** Accent hex, e.g. '#a78bfa'. */

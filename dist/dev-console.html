@@ -160,6 +160,13 @@
       .node .login:hover { background: color-mix(in srgb, var(--accent) 26%, var(--panel-2)); }
       .node .login:active { transform: scale(0.98); }
       .node .login .where { flex: 0 0 auto; font: 500 10px var(--mono); color: var(--ink-dim); }
+      .node .login + .login { margin-top: -4px; }
+      .node .login.copy {
+        justify-content: center; font-weight: 500; font-size: 11px; color: var(--ink-dim);
+        background: transparent; border-style: dashed;
+        border-color: color-mix(in srgb, var(--accent) 30%, var(--line));
+      }
+      .node .login.copy:hover { color: var(--ink); background: color-mix(in srgb, var(--accent) 10%, var(--panel-2)); }
 
       .empty { color: var(--ink-faint); font-size: 13px; text-align: center; padding: 40px; line-height: 1.6; }
       .empty code { font-family: var(--mono); color: var(--ink-dim); }
@@ -303,14 +310,23 @@
         el.innerHTML =
           `<div class="head"><div class="ico">${ico}</div><div class="titles"><div class="name">${esc(node.name)}</div><div class="tag">${esc(node.tag)}</div></div></div>` +
           `<div class="body">${body}</div>`;
-        if (node.login) {
-          const url = GRAPH.apps[node.login.app] || (APPS[node.login.app] || {}).url || '';
-          const port = (url.match(/:(\d+)/) || [])[1] || '';
+        // One button per login target. `logins` (multiple) wins over `login` (single).
+        const targets = node.logins && node.logins.length ? node.logins : node.login ? [node.login] : [];
+        for (const t of targets) {
+          const isCopy = t.mode === 'copy';
           const btn = document.createElement('div');
-          btn.className = 'login';
-          btn.dataset.app = node.login.app;
-          btn.innerHTML = `Login as ${esc(node.name)} →<span class="where">:${port}</span>`;
-          btn.onclick = () => doLogin(node);
+          btn.className = 'login' + (isCopy ? ' copy' : '');
+          btn.dataset.app = t.app;
+          if (isCopy) btn.dataset.copy = '1';
+          if (isCopy) {
+            btn.innerHTML = esc(t.label || '📋 copy token');
+          } else {
+            const url = GRAPH.apps[t.app] || (APPS[t.app] || {}).url || '';
+            const port = (url.match(/:(\d+)/) || [])[1] || '';
+            const label = t.label ? esc(t.label) : `Login as ${esc(node.name)}`;
+            btn.innerHTML = `${label} →<span class="where">:${port}</span>`;
+          }
+          btn.onclick = () => doLogin(node, t);
           el.appendChild(btn);
         }
         return el;
@@ -457,10 +473,15 @@
         });
       }
 
-      async function doLogin(node) {
+      async function doLogin(node, target) {
+        const t = target || node.login || (node.logins && node.logins[0]);
+        if (!t) return;
         const accent = accentOf(node.role);
-        const app = node.login.app;
-        if (HEALTH[app] === false) {
+        const isCopy = t.mode === 'copy';
+        const app = t.app;
+        // Only gate on health for openable apps — copy targets (mini-program / native)
+        // have no local web server to ping.
+        if (!isCopy && HEALTH[app] === false) {
           toast(
             `${(APPS[app] && APPS[app].label) || app} isn't running`,
             `start it first, then click again:\n${cmdFor(app)}`,
@@ -473,26 +494,35 @@
             method: 'POST',
             headers: { 'content-type': 'application/json' },
             credentials: 'include',
-            body: JSON.stringify({
-              kind: node.login.kind,
-              id: node.login.id,
-              app: node.login.app,
-              path: node.login.path,
-            }),
+            body: JSON.stringify({ kind: t.kind, id: t.id, app: t.app, path: t.path, mode: t.mode }),
           });
           if (!res.ok) {
-            const t = await res.text();
-            toast('Login failed', `<span class="err">${res.status}</span> ${esc(t).slice(0, 200)}`, accent);
+            const txt = await res.text();
+            toast('Login failed', `<span class="err">${res.status}</span> ${esc(txt).slice(0, 200)}`, accent);
             return;
           }
-          // A token-based provider can return { openUrl } to override the deep-link
-          // (e.g. carry a freshly-minted token in the URL). Cookie providers return
-          // their session payload (no openUrl) → fall back to base + path.
           const data = await res.json().catch(() => null);
+          // Copy mode: hand the raw token to the clipboard for a non-openable end.
+          if (isCopy) {
+            const tok = (data && (data.token || data.openUrl)) || '';
+            try {
+              await navigator.clipboard.writeText(tok);
+              toast(
+                `Copied token for ${node.name}`,
+                `${esc((t.label || app))}\n<span class="ok">✓ paste it into the app / devtools</span>`,
+                accent,
+              );
+            } catch (e) {
+              toast('Copy failed', `token:\n<code>${esc(tok).slice(0, 80)}…</code>`, accent);
+            }
+            return;
+          }
+          // Open mode: a token-based provider can return { openUrl } to override the
+          // deep-link; cookie providers return no openUrl → fall back to base + path.
           const url =
             data && typeof data.openUrl === 'string' && data.openUrl
               ? data.openUrl
-              : (GRAPH.apps[node.login.app] || '') + node.login.path;
+              : (GRAPH.apps[app] || '') + t.path;
           toast(
             `Logged in as ${node.name}`,
             `session set → opening\n${esc(url)}\n<span class="ok">✓ open the tab to land in-session</span>`,
@@ -577,7 +607,7 @@
           });
         }
 
-        document.querySelectorAll('.node .login[data-app]').forEach((btn) => {
+        document.querySelectorAll('.node .login[data-app]:not(.copy)').forEach((btn) => {
           btn.classList.toggle('down', HEALTH[btn.dataset.app] === false);
         });
       }

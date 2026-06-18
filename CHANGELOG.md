@@ -3,6 +3,19 @@
 All notable changes to this project are documented here.
 Format: [Keep a Changelog](https://keepachangelog.com/). Newest first.
 
+## [0.3.0] - 2026-06-18
+
+### Added
+- **Multiple login targets per node** — `DevGraphNode.logins?: DevLoginDescriptor[]`
+  renders one button each (e.g. open web + open admin), so a single identity that
+  exists across several frontends can be opened in any of them. `login` (single)
+  still works and is used when `logins` is empty.
+- **Copy-token targets** — a descriptor with `mode: 'copy'` copies the freshly
+  minted token to the clipboard instead of opening a URL, for ends a browser
+  can't deep-link into (WeChat mini-programs, native apps). The provider returns
+  `{ token }`; copy buttons are exempt from the app health-gate. Per-target
+  `label` overrides the button text.
+
 ## [0.2.0] - 2026-06-18
 
 ### Changed (packaging)

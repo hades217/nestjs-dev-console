@@ -153,6 +153,21 @@ A node with a `login` descriptor gets a button; `kind`/`id` are POSTed to
 `/dev/login` and handed verbatim to your `LoginProvider`; `app` + `path` decide
 which frontend opens afterward.
 
+**Multiple targets & copy mode.** A node can carry `logins: DevLoginDescriptor[]`
+to render several buttons — handy when one identity exists across multiple
+frontends (open in web, open in admin, …). Give each a `label`. A descriptor with
+`mode: 'copy'` copies the freshly-minted token to the clipboard instead of opening
+a URL — for ends a browser can't deep-link (WeChat mini-programs, native apps);
+your `LoginProvider` just returns `{ token }` for those.
+
+```ts
+logins: [
+  { kind: 'user', id, app: 'web',   path: '/',     label: 'web' },
+  { kind: 'user', id, app: 'admin', path: '/home', label: 'admin' },
+  { kind: 'user', id, app: 'app',   path: '',      label: '📋 token', mode: 'copy' },
+]
+```
+
 ## FAQ
 
 **Why does logging in on one app affect another locally?**

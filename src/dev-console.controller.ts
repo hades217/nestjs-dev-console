@@ -94,7 +94,7 @@ function parseLoginBody(body: unknown): DevLoginBody {
   if (typeof body !== 'object' || body === null) {
     throw new BadRequestException('body must be an object');
   }
-  const { kind, id, app, path } = body as Record<string, unknown>;
+  const { kind, id, app, path, mode } = body as Record<string, unknown>;
   if (typeof kind !== 'string' || kind.length < 1 || kind.length > 32) {
     throw new BadRequestException('kind must be a 1–32 char string');
   }
@@ -104,6 +104,7 @@ function parseLoginBody(body: unknown): DevLoginBody {
   const out: DevLoginBody = { kind, id };
   if (typeof app === 'string' && app.length <= 64) out.app = app;
   if (typeof path === 'string' && path.length <= 256) out.path = path;
+  if (mode === 'open' || mode === 'copy') out.mode = mode;
   return out;
 }
 

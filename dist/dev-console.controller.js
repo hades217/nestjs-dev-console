@@ -98,7 +98,7 @@ function parseLoginBody(body) {
     if (typeof body !== 'object' || body === null) {
         throw new common_1.BadRequestException('body must be an object');
     }
-    const { kind, id, app, path } = body;
+    const { kind, id, app, path, mode } = body;
     if (typeof kind !== 'string' || kind.length < 1 || kind.length > 32) {
         throw new common_1.BadRequestException('kind must be a 1–32 char string');
     }
@@ -110,6 +110,8 @@ function parseLoginBody(body) {
         out.app = app;
     if (typeof path === 'string' && path.length <= 256)
         out.path = path;
+    if (mode === 'open' || mode === 'copy')
+        out.mode = mode;
     return out;
 }
 /** JSON for inline <script>: escape `<` so a `</script>` in data can't break out. */

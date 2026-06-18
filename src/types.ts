@@ -16,6 +16,14 @@ export interface DevLoginDescriptor {
   app: string;
   /** Path appended to the app URL after login (e.g. '/portal'). */
   path: string;
+  /** Button label override. Defaults to "Login as <name>" (open) / "📋 copy token" (copy). */
+  label?: string;
+  /**
+   * 'open' (default) deep-links into the app. 'copy' instead copies the minted
+   * token to the clipboard — for ends a browser can't open (WeChat mini-programs,
+   * native apps): your LoginProvider returns `{ token }` and the page copies it.
+   */
+  mode?: 'open' | 'copy';
 }
 
 export interface DevGraphNode {
@@ -28,7 +36,13 @@ export interface DevGraphNode {
   email?: string;
   /** Key/value rows shown in the card body. */
   info?: { k: string; v: string }[];
+  /** Single login target (back-compat). Prefer {@link logins} for multiple apps. */
   login?: DevLoginDescriptor;
+  /**
+   * Multiple login targets — one button each (e.g. open web + open admin + copy
+   * token for a mini-program). Takes precedence over {@link login} when non-empty.
+   */
+  logins?: DevLoginDescriptor[];
 }
 
 export interface DevGraphEdge {
@@ -84,6 +98,8 @@ export interface DevLoginBody {
   app?: string;
   /** The clicked node's post-login path. */
   path?: string;
+  /** 'open' (default) or 'copy' — echoes the clicked target's {@link DevLoginDescriptor.mode}. */
+  mode?: 'open' | 'copy';
 }
 
 /**
@@ -107,8 +123,11 @@ export interface LoginProvider {
   ): Promise<DevLoginResult> | DevLoginResult;
 }
 
-/** A provider may return anything; an `openUrl` string overrides the deep-link. */
-export type DevLoginResult = { openUrl?: string } | unknown;
+/**
+ * A provider may return anything. For `open` targets an `openUrl` string overrides
+ * the deep-link; for `copy` targets the page copies `token` to the clipboard.
+ */
+export type DevLoginResult = { openUrl?: string; token?: string } | unknown;
 
 // ─────────────────────────────────────────────────────────────────────────────
 // Client-facing config — serialized into the page (NO secrets here).

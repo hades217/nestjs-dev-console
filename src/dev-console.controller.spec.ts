@@ -91,6 +91,31 @@ describe('DevConsoleController', () => {
     expect(out).toEqual({ openUrl: 'http://localhost:8000/dev-login?token=abc' });
   });
 
+  it('POST /dev/login forwards mode:copy so a provider can return a raw token', async () => {
+    login.mockReturnValueOnce({ token: 'jwt.copy.me' });
+    const res = fakeRes();
+    const out = await ctrl.login(
+      { kind: 'user', id: 'u1', app: 'cert', mode: 'copy' },
+      {} as never,
+      res as never,
+    );
+    expect(login).toHaveBeenCalledWith(
+      { kind: 'user', id: 'u1', app: 'cert', mode: 'copy' },
+      expect.objectContaining({ res }),
+    );
+    expect(out).toEqual({ token: 'jwt.copy.me' });
+  });
+
+  it('POST /dev/login drops an invalid mode value', async () => {
+    const res = fakeRes();
+    await ctrl.login(
+      { kind: 'user', id: 'u1', mode: 'sudo' } as never,
+      {} as never,
+      res as never,
+    );
+    expect(login).toHaveBeenCalledWith({ kind: 'user', id: 'u1' }, expect.objectContaining({ res }));
+  });
+
   it('POST /dev/login drops non-string app/path instead of forwarding junk', async () => {
     const res = fakeRes();
     await ctrl.login(
